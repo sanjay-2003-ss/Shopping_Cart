@@ -15,12 +15,6 @@ Users can browse products, filter by category, search, and add/remove items from
 - 🧾 **Checkout with Invoice Preview**  
 - 🎨 Styled with **TailwindCSS** + gradient background  
 
----
-
-## 📸 Demo Screenshot  
-(Add a screenshot of your project UI here)  
-
----
 
 ## 🚀 Getting Started  
 
