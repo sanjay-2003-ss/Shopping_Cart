@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shopping Cart</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-r from-indigo-100 via-purple-300 to-pink-200">
+  <h1 class="text-3xl font-bold text-center mb-6 mt-3">🛒 Shopping Cart</h1>
+
+  <!-- Search + Category Filters -->
+  <div class="flex flex-col items-center gap-4 mb-6">
+    <!-- Search Bar -->
+    <input type="text" id="searchInput" placeholder="Search products..." oninput="filterProducts()" 
+      class="w-80 p-2 rounded-lg border border-gray-300 shadow-lg">
+
+    <!-- Category Buttons -->
+    <div class="flex flex-wrap justify-center gap-3">
+      <button onclick="setCategory('All')" class="category-btn bg-blue-500 text-white px-4 py-2 rounded-lg">All</button>
+      <button onclick="setCategory('Electronics')" class="category-btn bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300">Electronics</button>
+      <button onclick="setCategory('Accessories')" class="category-btn bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300">Accessories</button>
+      <button onclick="setCategory('Appliances')" class="category-btn bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300">Appliances</button>
+    </div>
+  </div>
+
+  <!-- Product Section -->
+  <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-10"></div>
+
+  <!-- Your Cart -->
+  <div class="bg-white rounded-2xl p-5 max-w-3xl mx-auto shadow-lg">
+    <h2 class="text-xl font-semibold mb-3"> 🛍️ Your Cart</h2>
+    <ul class="space-y-3" id="cartList"></ul>
+    <p class="mt-4 font-bold text-lg">Total: ₹<span id="totalPrice">0</span></p>
+
+    <div class="flex gap-3 mt-4">
+      <button onclick="clearCart()" class="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">Clear Cart</button>
+      <button onclick="checkout()" class="flex-1 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">Checkout</button>
+    </div>
+  </div>
+
+  <!-- Checkout Modal -->
+  <div id="checkoutModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+    <div class="bg-white w-96 rounded-xl shadow-lg p-6">
+      <h2 class="text-xl font-bold mb-4">🧾 Invoice</h2>
+      <div id="invoiceItems" class="space-y-2"></div>
+      <p class="mt-4 font-bold text-lg">Total: ₹<span id="invoiceTotal">0</span></p>
+
+      <div class="flex justify-end gap-3 mt-6">
+        <button onclick="closeModal()" class="bg-gray-300 px-4 py-2 rounded-lg hover:bg-gray-400">Close</button>
+        <button onclick="confirmOrder()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Product Data with Images + Categories  (Product data (your mini database))
+    const products = [
+      { name: "Laptop", price: 50000, category: "Electronics", img:"images/laptop.jpg", },
+      { name: "Headphone", price: 2000, category: "Accessories", img: "images/headPhone.jpg" },
+      { name: "Smartphone", price: 30000, category: "Electronics", img: "images/Iphone.jpg" },
+      { name: "Gaming Joystick", price: 5000, category: "Accessories", img: "images/jt.jpg" },
+      { name: "Smart TV", price: 72000, category: "Appliances", img: "images/tv.jpg" },
+      { name: "Tab", price: 25000, category: "Electronics", img:"images/tab.jpg", },
+      { name: "Smart Watch", price: 3500, category: "Accessories", img: "images/sm.jpg" },
+      { name: "Refrigerator", price: 45000, category: "Appliances", img: "images/fridge.jpg" },
+      { name: "Washing Machine", price: 30000, category: "Appliances", img: "images/machine.jpg" }
+    ];
+
+    //  App “state” (things that change)
+    let cart = JSON.parse(localStorage.getItem("cart")) || [];
+    let selectedCategory = "All";
+
+    // Rendering products (draw the product cards)
+    function renderProducts(filter = "") {
+      const grid = document.getElementById("productGrid");
+      grid.innerHTML = "";
+
+      const filtered = products.filter(p => {
+        const matchesSearch = p.name.toLowerCase().includes(filter.toLowerCase());
+        const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+      });
+
+      if (filtered.length === 0) {
+        grid.innerHTML = "<p class='text-gray-600 text-center col-span-3'>No products found.</p>";
+        return;
+      }
+
+      filtered.forEach(p => {
+        const div = document.createElement("div");
+        div.className = "bg-white p-5 shadow flex flex-col items-center rounded-2xl cursor-pointer transform hover:-translate-y-2";
+        div.innerHTML = `
+          <img src="${p.img}" alt="${p.name}" class="w-38 h-38 object-cover mb-3 rounded-lg shadow">
+          <h2 class="text-lg font-semibold">${p.name}</h2>
+          <p class="text-gray-600">₹${p.price.toLocaleString()}</p>
+          <button onclick="addToCart('${p.name}',${p.price})" 
+            class="mt-3 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+            Add to Cart
+          </button>
+        `;
+        grid.appendChild(div);
+      });
+    }
+
+    // Render Cart
+    function renderCart() {
+      const cartList = document.getElementById("cartList");
+      const totalPriceElem = document.getElementById("totalPrice");
+      cartList.innerHTML = "";
+
+      if (cart.length === 0) {
+        cartList.innerHTML = "<p class='text-gray-500'>Your cart is empty.</p>";
+        totalPriceElem.innerText = 0;
+        return;
+      }
+
+      let total = 0;
+      cart.forEach((item, index) => {
+        total += item.price * item.quantity;
+
+        const li = document.createElement("li");
+        li.className = "flex justify-between items-center bg-gray-100 p-3 rounded-lg";
+        li.innerHTML = `
+          <span class="font-medium">${item.name} (₹${item.price})</span>
+          <div class="flex items-center gap-2">
+            <button onclick="decreaseQty(${index})" class="px-2 bg-gray-300 rounded">-</button>
+            <span>${item.quantity}</span>
+            <button onclick="increaseQty(${index})" class="px-2 bg-gray-300 rounded">+</button>
+            <button onclick="removeItem(${index})" class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Remove</button>
+          </div>
+        `;
+        cartList.appendChild(li);
+      });
+
+      totalPriceElem.innerText = total.toLocaleString();
+      localStorage.setItem("cart", JSON.stringify(cart));
+    }
+
+    // Cart Functions
+    function addToCart(name, price) {
+      const itemIndex = cart.findIndex(item => item.name === name);
+      if (itemIndex > -1) {
+        cart[itemIndex].quantity += 1;
+      } else {
+        cart.push({ name, price, quantity: 1 });
+      }
+      renderCart();
+    }
+
+    function increaseQty(index) {
+      cart[index].quantity += 1;
+      renderCart();
+    }
+
+    function decreaseQty(index) {
+      if (cart[index].quantity > 1) {
+        cart[index].quantity -= 1;
+      } else {
+        cart.splice(index, 1);
+      }
+      renderCart();
+    }
+
+    function removeItem(index) {
+      cart.splice(index, 1);
+      renderCart();
+    }
+
+    function clearCart() {
+      cart = [];
+      renderCart();
+    }
+
+    // Search Filter
+    function filterProducts() {
+      const query = document.getElementById("searchInput").value;
+      renderProducts(query);
+    }
+
+    // Category Filter
+    function setCategory(category) {
+      selectedCategory = category;
+      document.querySelectorAll(".category-btn").forEach(btn => {
+        btn.classList.remove("bg-blue-500", "text-white");
+        btn.classList.add("bg-gray-200");
+      });
+      event.target.classList.add("bg-blue-500", "text-white");
+      renderProducts(document.getElementById("searchInput").value);
+    }
+
+    // Checkout
+    function checkout() {
+      if (cart.length === 0) {
+        alert("Your cart is empty!");
+        return;
+      }
+
+      const invoiceItems = document.getElementById("invoiceItems");
+      const invoiceTotal = document.getElementById("invoiceTotal");
+      invoiceItems.innerHTML = "";
+
+      let total = 0;
+      cart.forEach(item => {
+        total += item.price * item.quantity;
+        const div = document.createElement("div");
+        div.className = "flex justify-between";
+        div.innerHTML = `<span>${item.name} x${item.quantity}</span><span>₹${(item.price * item.quantity).toLocaleString()}</span>`;
+        invoiceItems.appendChild(div);
+      });
+
+      invoiceTotal.innerText = total.toLocaleString();
+      document.getElementById("checkoutModal").classList.remove("hidden");
+    }
+
+    function closeModal() {
+      document.getElementById("checkoutModal").classList.add("hidden");
+    }
+
+    function confirmOrder() {
+      alert("✅ Order placed successfully! Thank you for shopping.");
+      clearCart();
+      closeModal();
+    }
+
+    // Initial Render
+    renderProducts();
+    renderCart();
+  </script>
+</body>
+</html>
